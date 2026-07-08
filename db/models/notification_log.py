@@ -23,7 +23,11 @@ class NotificationLog(Base):
     # цена, при которой сработало уведомление
     price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     status: Mapped[NotificationStatus] = mapped_column(
-        SAEnum(NotificationStatus, name="notification_status"),
+        SAEnum(
+            NotificationStatus,
+            name="notification_status",
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
         default=NotificationStatus.SENT,
         nullable=False,
     )

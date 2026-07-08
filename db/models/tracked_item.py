@@ -34,7 +34,12 @@ class TrackedItem(Base, TimestampMixin):
     )
 
     marketplace: Mapped[Marketplace] = mapped_column(
-        SAEnum(Marketplace, name="marketplace"), nullable=False
+        SAEnum(
+            Marketplace,
+            name="marketplace",
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
+        nullable=False,
     )
     # external_id — артикул товара внутри маркетплейса (SKU/nm_id)
     external_id: Mapped[str] = mapped_column(String(64), nullable=False)

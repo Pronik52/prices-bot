@@ -25,7 +25,12 @@ class User(Base, TimestampMixin):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     subscription_tier: Mapped[SubscriptionTier] = mapped_column(
-        SAEnum(SubscriptionTier, name="subscription_tier"),
+        SAEnum(
+            SubscriptionTier,
+            name="subscription_tier",
+            # хранить .value (нижний регистр), а не имя члена (FREE)
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
         default=SubscriptionTier.FREE,
         nullable=False,
     )
