@@ -19,7 +19,9 @@ class OzonParser(BaseParser):
     # .../product/nazvanie-tovara-123456789/  -> берём последнее число
     url_id_pattern = re.compile(r"product/(?:[\w-]*?-)?(\d+)")
 
-    async def fetch_price(self, external_id: str) -> ParseResult:  # noqa: D401
+    async def fetch_price(
+        self, external_id: str, size_id: str | None = None
+    ) -> ParseResult:  # noqa: D401
         raise ParserBlocked(
             "Парсинг Ozon пока не реализован (требуется antibot-обход, Стадия 2)"
         )

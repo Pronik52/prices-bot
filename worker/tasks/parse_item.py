@@ -9,7 +9,7 @@ from api.services.notification_service import build_price_drop_message, should_n
 from db.models.notification_log import NotificationLog
 from db.repositories.item_repository import ItemRepository
 from db.session import session_scope
-from parsers import get_parser
+from parsers import extract_size_id, get_parser
 from parsers.exceptions import ItemNotFound, ParserBlocked, PriceUnavailable
 from shared.constants import NotificationStatus
 from worker.celery_app import celery_app
@@ -32,8 +32,10 @@ def parse_item(self, item_id: int) -> str:  # noqa: ANN001
             return "skipped"
 
         parser = get_parser(item.marketplace)
+        # выбранный вариант (размер) хранится в URL товара и влияет на цену
+        size_id = extract_size_id(item.url)
         try:
-            result = asyncio.run(parser.fetch_price(item.external_id))
+            result = asyncio.run(parser.fetch_price(item.external_id, size_id))
         except ParserBlocked as exc:
             # временная блокировка — повторим позже (возможно, с другим прокси)
             logger.warning("Блокировка при парсинге item=%s: %s", item_id, exc)

@@ -36,7 +36,9 @@ class WBParser(BaseParser):
         wait=wait_exponential(multiplier=1, min=1, max=8),
         reraise=True,
     )
-    async def fetch_price(self, external_id: str) -> ParseResult:
+    async def fetch_price(
+        self, external_id: str, size_id: str | None = None
+    ) -> ParseResult:
         params = {
             "appType": "1",
             "curr": "rub",
@@ -67,7 +69,7 @@ class WBParser(BaseParser):
 
         product = products[0]
         title = product.get("name")
-        price = self._extract_price(product)
+        price = self._extract_price(product, size_id)
         if price is None:
             raise PriceUnavailable(f"Цена товара {external_id} недоступна")
 
@@ -87,23 +89,43 @@ class WBParser(BaseParser):
         return body.get("products") or (body.get("data") or {}).get("products") or []
 
     @staticmethod
-    def _extract_price(product: dict) -> Decimal | None:
+    def _extract_price(product: dict, size_id: str | None = None) -> Decimal | None:
         """WB отдаёт цену в копейках. Форматы менялись — проверяем варианты.
 
         v4: sizes[].price.{product,total,basic}; product — цена со скидкой
-        продавца (её видит покупатель как основную). legacy: salePriceU/priceU.
+        продавца (её видит покупатель как основную). Если задан size_id, берём
+        цену именно этого варианта (optionId) — у разных размеров цена может
+        отличаться. legacy: salePriceU/priceU.
         """
-        for size in product.get("sizes") or []:
-            price_obj = size.get("price") or {}
-            raw = (
-                price_obj.get("product")
-                or price_obj.get("total")
-                or price_obj.get("basic")
-            )
-            if raw:
-                return Decimal(raw) / 100
+        sizes = product.get("sizes") or []
+
+        # Если указан вариант — сначала пытаемся найти именно его
+        if size_id is not None:
+            for size in sizes:
+                if str(size.get("optionId")) == str(size_id):
+                    price = WBParser._price_from_size(size)
+                    if price is not None:
+                        return price
+                    break  # нужный размер найден, но без цены — уходим в общий путь
+
+        # Иначе (или если у выбранного размера нет цены) — первый доступный
+        for size in sizes:
+            price = WBParser._price_from_size(size)
+            if price is not None:
+                return price
+
         # legacy (v2 и раньше): salePriceU / priceU в копейках
         raw = product.get("salePriceU") or product.get("priceU")
         if raw:
             return Decimal(raw) / 100
         return None
+
+    @staticmethod
+    def _price_from_size(size: dict) -> Decimal | None:
+        price_obj = size.get("price") or {}
+        raw = (
+            price_obj.get("product")
+            or price_obj.get("total")
+            or price_obj.get("basic")
+        )
+        return Decimal(raw) / 100 if raw else None

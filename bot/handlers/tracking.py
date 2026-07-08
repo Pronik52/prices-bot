@@ -1,6 +1,7 @@
 """Хендлеры добавления/просмотра/удаления отслеживаемых товаров."""
 from __future__ import annotations
 
+import re
 from decimal import Decimal, InvalidOperation
 
 from aiogram import F, Router
@@ -12,6 +13,10 @@ from bot.client import ApiClient, ApiError
 from bot.keyboards import cancel, items_list, main_menu
 
 router = Router()
+
+# Ссылка в сообщении: начинается с http(s), заканчивается на пробеле/переносе/конце.
+# ВБ присылает товар текстом «Название\nhttps://...» — вырезаем сам URL.
+_URL_RE = re.compile(r"https?://\S+")
 
 
 class AddItem(StatesGroup):
@@ -44,10 +49,13 @@ async def cb_add_item(callback: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(AddItem.waiting_url)
 async def on_url(message: Message, state: FSMContext) -> None:
-    url = (message.text or "").strip()
-    if not url.startswith("http"):
-        await message.answer("Это не похоже на ссылку. Пришли URL товара.")
+    match = _URL_RE.search(message.text or "")
+    if not match:
+        await message.answer(
+            "Не нашёл ссылку в сообщении. Пришли URL товара (начинается с http)."
+        )
         return
+    url = match.group(0)
     await state.update_data(url=url)
     await state.set_state(AddItem.waiting_target)
     await message.answer(

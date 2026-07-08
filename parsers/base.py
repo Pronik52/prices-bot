@@ -19,6 +19,8 @@ class ItemRef:
 
     marketplace: Marketplace
     external_id: str
+    # выбранный вариант товара (для WB — optionId размера); влияет на цену
+    size_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -47,9 +49,12 @@ class BaseParser(ABC):
         return match.group(1)
 
     @abstractmethod
-    async def fetch_price(self, external_id: str) -> ParseResult:
+    async def fetch_price(
+        self, external_id: str, size_id: str | None = None
+    ) -> ParseResult:
         """Возвращает актуальную цену товара по его артикулу.
 
+        size_id — выбранный вариант (для WB цена может зависеть от размера).
         Должен бросать соответствующие исключения из parsers.exceptions:
         ItemNotFound, ParserBlocked, PriceUnavailable.
         """
