@@ -21,7 +21,8 @@ from parsers.exceptions import ItemNotFound, ParserBlocked, PriceUnavailable
 from parsers.proxy_manager import proxy_manager
 from shared.constants import Marketplace
 
-_CARD_API = "https://card.wb.ru/cards/v2/detail"
+# WB мигрировал карточку на v4; v2/v1 отдают 404
+_CARD_API = "https://card.wb.ru/cards/v4/detail"
 
 
 class WBParser(BaseParser):
@@ -79,14 +80,21 @@ class WBParser(BaseParser):
 
     @staticmethod
     def _extract_price(product: dict) -> Decimal | None:
-        """WB отдаёт цену в копейках. Формат менялся — проверяем оба варианта."""
-        # v2: sizes[].price.{basic,product} в копейках
+        """WB отдаёт цену в копейках. Форматы менялись — проверяем варианты.
+
+        v4: sizes[].price.{product,total,basic}; product — цена со скидкой
+        продавца (её видит покупатель как основную). legacy: salePriceU/priceU.
+        """
         for size in product.get("sizes") or []:
             price_obj = size.get("price") or {}
-            raw = price_obj.get("product") or price_obj.get("basic")
+            raw = (
+                price_obj.get("product")
+                or price_obj.get("total")
+                or price_obj.get("basic")
+            )
             if raw:
                 return Decimal(raw) / 100
-        # legacy: salePriceU / priceU в копейках
+        # legacy (v2 и раньше): salePriceU / priceU в копейках
         raw = product.get("salePriceU") or product.get("priceU")
         if raw:
             return Decimal(raw) / 100

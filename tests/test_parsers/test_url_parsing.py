@@ -41,3 +41,14 @@ def test_wb_price_from_sizes():
 def test_wb_price_legacy():
     product = {"name": "X", "salePriceU": 250000}
     assert WBParser._extract_price(product) == 2500
+
+
+def test_wb_price_v4_total_fallback():
+    # v4: если нет product, берём total
+    product = {"name": "X", "sizes": [{"price": {"total": 149900}}]}
+    assert WBParser._extract_price(product) == 1499
+
+
+def test_wb_price_missing():
+    product = {"name": "X", "sizes": [{"price": {}}]}
+    assert WBParser._extract_price(product) is None
