@@ -27,6 +27,12 @@ docker compose up --build
 Поднимутся 5 сервисов + одноразовый прогон миграций (`migrate`).
 API-доки: http://localhost:8000/docs
 
+Для обновления на сервере есть скрипт (git pull + пересборка на Compose v2):
+
+```bash
+./deploy.sh
+```
+
 ## Разработка / тесты
 
 ```bash
