@@ -83,7 +83,8 @@ async def on_target(message: Message, state: FSMContext, api: ApiClient) -> None
     goal = f"\nЦель: {target:.0f} ₽" if target is not None else ""
     await message.answer(
         f"✅ Отслеживаю: <b>{title}</b>\n"
-        f"Маркетплейс: {item['marketplace']}{goal}",
+        f"Маркетплейс: {item['marketplace']}{goal}\n\n"
+        f"⏳ Определяю текущую цену — она появится в «Мои товары» через несколько секунд.",
         reply_markup=main_menu(),
     )
 

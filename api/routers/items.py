@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, verify_internal_token
+from api.queue import enqueue_parse_item
 from api.schemas.item import (
     ItemCreate,
     ItemPriceHistoryRead,
@@ -41,6 +42,9 @@ def add_item(payload: ItemCreate, session: Session = Depends(get_db)) -> ItemRea
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except LimitReachedError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
+
+    # Немедленный парсинг: цена появится в «Мои товары» через пару секунд
+    enqueue_parse_item(item.id)
     return item
 
 
