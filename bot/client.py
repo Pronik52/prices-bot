@@ -31,7 +31,12 @@ class ApiClient:
         await self._client.aclose()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
-        resp = await self._client.request(method, path, **kwargs)
+        try:
+            resp = await self._client.request(method, path, **kwargs)
+        except httpx.RequestError as exc:
+            # сеть/DNS/таймаут: API недоступен — превращаем в понятную ApiError,
+            # чтобы хендлеры не падали молча
+            raise ApiError(503, "Сервис временно недоступен, попробуйте позже") from exc
         if resp.status_code >= 400:
             detail = "Ошибка сервиса"
             try:

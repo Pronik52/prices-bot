@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import logging
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, Message
 
 from bot.client import ApiClient
 from bot.keyboards import main_menu
@@ -42,3 +42,10 @@ async def cmd_start(message: Message, api: ApiClient) -> None:
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
     await message.answer(HELP, reply_markup=main_menu())
+
+
+@router.callback_query(F.data == "menu")
+async def cb_menu(callback: CallbackQuery) -> None:
+    """Возврат в главное меню (редактирует текущее сообщение)."""
+    await callback.message.edit_text(WELCOME, reply_markup=main_menu())
+    await callback.answer()

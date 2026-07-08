@@ -6,10 +6,10 @@ from decimal import Decimal, InvalidOperation
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, LinkPreviewOptions, Message
 
 from bot.client import ApiClient, ApiError
-from bot.keyboards import cancel, item_actions, main_menu
+from bot.keyboards import cancel, items_list, main_menu
 
 router = Router()
 
@@ -91,37 +91,49 @@ async def on_target(message: Message, state: FSMContext, api: ApiClient) -> None
 # --- Список и удаление ---
 
 
-@router.callback_query(F.data == "list_items")
-async def cb_list_items(callback: CallbackQuery, api: ApiClient) -> None:
+def _render_items(items: list[dict]) -> str:
+    """Текст списка товаров одним сообщением."""
+    lines = ["📋 <b>Твои товары:</b>\n"]
+    for i, item in enumerate(items, 1):
+        title = item.get("title") or f"Товар {item['external_id']}"
+        last = f"{Decimal(item['last_price']):.0f} ₽" if item.get("last_price") else "—"
+        goal = (
+            f" · цель {Decimal(item['target_price']):.0f} ₽"
+            if item.get("target_price")
+            else ""
+        )
+        lines.append(
+            f"{i}. <a href=\"{item['url']}\">{title}</a>\n"
+            f"   {item['marketplace']} · сейчас {last}{goal}"
+        )
+    lines.append("\nНажми 🗑, чтобы снять товар с отслеживания.")
+    return "\n".join(lines)
+
+
+async def _show_items(callback: CallbackQuery, api: ApiClient) -> None:
+    """Показывает/обновляет список в том же сообщении (edit)."""
     try:
         items = await api.list_items(callback.from_user.id)
     except ApiError as exc:
         await callback.message.edit_text(f"⚠️ {exc.detail}", reply_markup=main_menu())
-        await callback.answer()
         return
 
     if not items:
         await callback.message.edit_text(
             "У тебя пока нет отслеживаемых товаров.", reply_markup=main_menu()
         )
-        await callback.answer()
         return
 
-    await callback.message.edit_text("📋 <b>Твои товары:</b>", reply_markup=main_menu())
-    for item in items:
-        title = item.get("title") or f"Товар {item['external_id']}"
-        last = f"{Decimal(item['last_price']):.0f} ₽" if item.get("last_price") else "—"
-        goal = (
-            f"\nЦель: {Decimal(item['target_price']):.0f} ₽"
-            if item.get("target_price")
-            else ""
-        )
-        text = (
-            f"<b>{title}</b>\n"
-            f"{item['marketplace']} · текущая цена: {last}{goal}\n"
-            f'<a href="{item["url"]}">ссылка</a>'
-        )
-        await callback.message.answer(text, reply_markup=item_actions(item["id"]))
+    await callback.message.edit_text(
+        _render_items(items),
+        reply_markup=items_list(items),
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
+    )
+
+
+@router.callback_query(F.data == "list_items")
+async def cb_list_items(callback: CallbackQuery, api: ApiClient) -> None:
+    await _show_items(callback, api)
     await callback.answer()
 
 
@@ -133,5 +145,6 @@ async def cb_delete_item(callback: CallbackQuery, api: ApiClient) -> None:
     except ApiError as exc:
         await callback.answer(exc.detail, show_alert=True)
         return
-    await callback.message.edit_text("🗑 Товар удалён из отслеживания.")
-    await callback.answer()
+    # перерисовываем тот же список без удалённого товара
+    await _show_items(callback, api)
+    await callback.answer("Удалено")

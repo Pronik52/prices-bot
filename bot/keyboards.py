@@ -14,17 +14,19 @@ def main_menu() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def item_actions(item_id: int) -> InlineKeyboardMarkup:
-    """Кнопка удаления конкретного товара."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🗑 Удалить", callback_data=f"del_item:{item_id}"
-                )
-            ]
-        ]
-    )
+def items_list(items: list[dict]) -> InlineKeyboardMarkup:
+    """Одна клавиатура на весь список: по кнопке удаления на товар + «В меню».
+
+    Всё в одном сообщении, которое затем редактируется — без спама новыми
+    сообщениями.
+    """
+    builder = InlineKeyboardBuilder()
+    for it in items:
+        title = it.get("title") or f"Товар {it['external_id']}"
+        builder.button(text=f"🗑 {title[:28]}", callback_data=f"del_item:{it['id']}")
+    builder.button(text="◀️ В меню", callback_data="menu")
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 def cancel() -> InlineKeyboardMarkup:
