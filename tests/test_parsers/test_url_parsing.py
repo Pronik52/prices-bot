@@ -1,6 +1,8 @@
 """Тесты разбора ссылок (без сети)."""
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from parsers import extract_item_ref, extract_size_id
@@ -101,3 +103,9 @@ def test_wb_price_size_fallback_when_no_match():
     product = {"sizes": [{"optionId": 111, "price": {"product": 500000}}]}
     # запрошенного варианта нет — берём первый доступный
     assert WBParser._extract_price(product, "999") == 5000
+
+
+def test_wb_wallet_discount_default_3pct():
+    # 30324 без кошелька -> 29414 с кошельком (3%, как на витрине WB)
+    assert WBParser._apply_wallet_discount(Decimal(30324)) == 29414
+    assert WBParser._apply_wallet_discount(Decimal(2157)) == 2092

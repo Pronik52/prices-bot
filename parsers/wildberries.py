@@ -5,8 +5,9 @@ WB отдаёт цены через card.wb.ru без HTML-парсинга — 
 """
 from __future__ import annotations
 
+import os
 import re
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import httpx
 from tenacity import (
@@ -23,6 +24,10 @@ from shared.constants import Marketplace
 
 # WB мигрировал карточку на v4; v2/v1 отдают 404
 _CARD_API = "https://card.wb.ru/cards/v4/detail"
+
+# Скидка при оплате WB Кошельком (платформенный промо, ~3%). В ответе API её нет —
+# WB применяет её на фронте к цене product. Выносим в env, чтобы менять без кода.
+_WALLET_DISCOUNT = Decimal(os.getenv("WB_WALLET_DISCOUNT_PERCENT", "3")) / 100
 
 
 class WBParser(BaseParser):
@@ -73,6 +78,9 @@ class WBParser(BaseParser):
         if price is None:
             raise PriceUnavailable(f"Цена товара {external_id} недоступна")
 
+        # Цена, которую видит покупатель, — с учётом скидки WB Кошелька
+        price = self._apply_wallet_discount(price)
+
         return ParseResult(
             external_id=external_id,
             price=price,
@@ -119,6 +127,12 @@ class WBParser(BaseParser):
         if raw:
             return Decimal(raw) / 100
         return None
+
+    @staticmethod
+    def _apply_wallet_discount(price: Decimal) -> Decimal:
+        """Применяет скидку WB Кошелька, округляя до целого рубля."""
+        discounted = price * (Decimal(1) - _WALLET_DISCOUNT)
+        return discounted.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
     @staticmethod
     def _price_from_size(size: dict) -> Decimal | None:
