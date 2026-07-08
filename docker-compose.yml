@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: price_tracker
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d price_tracker"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Одноразовый прогон миграций перед запуском API/воркеров
+  migrate:
+    build: .
+    command: alembic upgrade head
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    # Порт доступен только с самого сервера (бот/воркер ходят по внутренней сети
+    # docker по имени "api"). Для /docs — SSH-туннель: ssh -L 8000:localhost:8000 ...
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  bot:
+    build: .
+    command: python -m bot.main
+    env_file: .env
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    command: celery -A worker.celery_app worker --loglevel=info --concurrency=4
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  celery_beat:
+    build: .
+    command: celery -A worker.celery_app beat --loglevel=info
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pg_data:
