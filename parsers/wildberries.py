@@ -61,7 +61,7 @@ class WBParser(BaseParser):
         if resp.status_code != 200:
             raise ItemNotFound(f"WB вернул статус {resp.status_code}")
 
-        products = (resp.json().get("data") or {}).get("products") or []
+        products = self._extract_products(resp.json())
         if not products:
             raise ItemNotFound(f"Товар {external_id} не найден на WB")
 
@@ -77,6 +77,14 @@ class WBParser(BaseParser):
             title=title,
             in_stock=True,
         )
+
+    @staticmethod
+    def _extract_products(body: dict) -> list[dict]:
+        """Достаёт список товаров из ответа.
+
+        v4: products на верхнем уровне. v2 и раньше: под ключом data.
+        """
+        return body.get("products") or (body.get("data") or {}).get("products") or []
 
     @staticmethod
     def _extract_price(product: dict) -> Decimal | None:

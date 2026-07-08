@@ -52,3 +52,19 @@ def test_wb_price_v4_total_fallback():
 def test_wb_price_missing():
     product = {"name": "X", "sizes": [{"price": {}}]}
     assert WBParser._extract_price(product) is None
+
+
+def test_wb_products_v4_top_level():
+    # v4: products на верхнем уровне
+    body = {"products": [{"id": 1, "name": "A"}]}
+    assert WBParser._extract_products(body)[0]["name"] == "A"
+
+
+def test_wb_products_legacy_data_wrapper():
+    # v2 и раньше: под ключом data
+    body = {"data": {"products": [{"id": 2, "name": "B"}]}}
+    assert WBParser._extract_products(body)[0]["name"] == "B"
+
+
+def test_wb_products_empty():
+    assert WBParser._extract_products({"products": []}) == []
