@@ -19,22 +19,23 @@ def _item(target=None, last=None) -> TrackedItem:
     )
 
 
-def test_no_target_no_notify():
-    assert should_notify(_item(target=None), Decimal(100)) is False
+def test_no_previous_price_no_notify():
+    # первый парсинг — сравнивать не с чем, не уведомляем
+    assert should_notify(_item(last=None), Decimal(100)) is False
 
 
-def test_price_above_target_no_notify():
-    assert should_notify(_item(target=1000, last=1500), Decimal(1200)) is False
+def test_price_increase_no_notify():
+    assert should_notify(_item(last=1000), Decimal(1200)) is False
 
 
-def test_price_crosses_down_notifies():
-    assert should_notify(_item(target=1000, last=1500), Decimal(950)) is True
+def test_price_unchanged_no_notify():
+    assert should_notify(_item(last=1000), Decimal(1000)) is False
 
 
-def test_first_time_below_target_notifies():
-    assert should_notify(_item(target=1000, last=None), Decimal(900)) is True
+def test_any_price_drop_notifies():
+    assert should_notify(_item(last=1500), Decimal(1450)) is True
 
 
-def test_already_below_does_not_spam():
-    # прошлая цена уже была не выше цели — повторно не уведомляем
-    assert should_notify(_item(target=1000, last=900), Decimal(880)) is False
+def test_price_drop_notifies_regardless_of_target():
+    # целевая цена не задана, но цена снизилась — уведомляем
+    assert should_notify(_item(target=None, last=1000), Decimal(900)) is True

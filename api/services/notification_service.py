@@ -7,21 +7,15 @@ from db.models.tracked_item import TrackedItem
 
 
 def should_notify(item: TrackedItem, new_price: Decimal) -> bool:
-    """Уведомляем, если задана целевая цена и новая цена опустилась до/ниже неё.
+    """Уведомляем при любом снижении цены относительно последней зафиксированной.
 
-    Дополнительно защищаемся от повторного спама: не уведомляем, если прошлая
-    зафиксированная цена уже была не выше целевой (значит, уже уведомляли).
+    Первый парсинг (когда прошлой цены ещё нет) уведомлением не сопровождается —
+    сравнивать не с чем. Далее сигналим на каждое падение цены, независимо от того,
+    задана ли целевая цена.
     """
-    if item.target_price is None:
-        return False
-    target = Decimal(item.target_price)
-    if new_price > target:
-        return False
-    # Новая цена достигла цели. Уведомляем только если это «свежее» пересечение:
-    # прошлая цена была выше целевой (или её ещё не было).
     if item.last_price is None:
-        return True
-    return Decimal(item.last_price) > target
+        return False
+    return new_price < Decimal(item.last_price)
 
 
 def build_price_drop_message(item: TrackedItem, new_price: Decimal) -> str:
