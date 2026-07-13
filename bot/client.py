@@ -81,3 +81,13 @@ class ApiClient:
     async def list_tiers(self) -> dict[str, int]:
         resp = await self._request("GET", "/subscriptions/tiers")
         return resp.json()
+
+    # --- Админка ---
+
+    async def get_admin_stats(self) -> dict:
+        resp = await self._request("GET", "/admin/stats")
+        return resp.json()
+
+    async def get_admin_users(self, page: int) -> dict:
+        resp = await self._request("GET", "/admin/users", params={"page": page})
+        return resp.json()

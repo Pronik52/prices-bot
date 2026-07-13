@@ -53,6 +53,17 @@ class ItemRepository:
         stmt = select(TrackedItem).where(TrackedItem.is_active.is_(True))
         return list(self.session.scalars(stmt))
 
+    def count_all(self) -> int:
+        return self.session.scalar(select(func.count()).select_from(TrackedItem)) or 0
+
+    def count_active(self) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(TrackedItem)
+            .where(TrackedItem.is_active.is_(True))
+        )
+        return self.session.scalar(stmt) or 0
+
     def create(
         self,
         user_id: int,
