@@ -10,7 +10,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, LinkPreviewOptions, Message
 
 from bot.client import ApiClient, ApiError
-from bot.keyboards import cancel, items_list, main_menu
+from bot.keyboards import BTN_ADD, BTN_LIST, cancel, items_list
 
 router = Router()
 
@@ -30,21 +30,36 @@ class AddItem(StatesGroup):
 @router.callback_query(F.data == "cancel")
 async def cb_cancel(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_text("Действие отменено.", reply_markup=main_menu())
+    await callback.message.edit_text("Действие отменено.")
     await callback.answer()
 
 
 # --- Добавление товара ---
+# Кнопки меню — обычные текстовые сообщения. Обработчики без state-фильтра
+# зарегистрированы выше FSM-хендлеров, поэтому кнопка меню всегда срабатывает,
+# даже если пользователь застрял посреди добавления товара.
 
 
-@router.callback_query(F.data == "add_item")
-async def cb_add_item(callback: CallbackQuery, state: FSMContext) -> None:
+@router.message(F.text == BTN_ADD)
+async def msg_add_item(message: Message, state: FSMContext) -> None:
+    # прерываем возможный процесс добавления — пользователь ушёл в другой пункт меню
+    await state.clear()
     await state.set_state(AddItem.waiting_url)
-    await callback.message.edit_text(
+    await message.answer(
         "Пришли ссылку на товар (Wildberries или Ozon):",
         reply_markup=cancel(),
     )
-    await callback.answer()
+
+
+@router.message(F.text == BTN_LIST)
+async def msg_list_items(message: Message, state: FSMContext, api: ApiClient) -> None:
+    await state.clear()  # см. комментарий в msg_add_item
+    try:
+        items = await api.list_items(message.from_user.id)
+    except ApiError as exc:
+        await message.answer(f"⚠️ {exc.detail}")
+        return
+    await _send_items(message.answer, items)
 
 
 @router.message(AddItem.waiting_url)
@@ -84,7 +99,7 @@ async def on_target(message: Message, state: FSMContext, api: ApiClient) -> None
     try:
         item = await api.add_item(message.from_user.id, data["url"], target)
     except ApiError as exc:
-        await message.answer(f"⚠️ {exc.detail}", reply_markup=main_menu())
+        await message.answer(f"⚠️ {exc.detail}")
         return
 
     title = item.get("title") or f"Товар {item['external_id']}"
@@ -92,12 +107,30 @@ async def on_target(message: Message, state: FSMContext, api: ApiClient) -> None
     await message.answer(
         f"✅ Отслеживаю: <b>{title}</b>\n"
         f"Маркетплейс: {item['marketplace']}{goal}\n\n"
-        f"⏳ Определяю текущую цену — она появится в «Мои товары» через несколько секунд.",
-        reply_markup=main_menu(),
+        f"⏳ Определяю текущую цену — она появится в «Мои товары» через несколько секунд."
     )
 
 
 # --- Список и удаление ---
+
+_EMPTY_LIST_TEXT = "У тебя пока нет отслеживаемых товаров."
+
+
+async def _send_items(send, items: list[dict]) -> None:
+    """Единый рендер списка через переданный отправитель.
+
+    `send` — это `message.answer` (новое сообщение) или `callback.message.edit_text`
+    (правка существующего): оба принимают одинаковые аргументы, поэтому логика
+    «пусто / список» живёт в одном месте.
+    """
+    if not items:
+        await send(_EMPTY_LIST_TEXT)
+        return
+    await send(
+        _render_items(items),
+        reply_markup=items_list(items),
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
+    )
 
 
 def _render_items(items: list[dict]) -> str:
@@ -119,33 +152,6 @@ def _render_items(items: list[dict]) -> str:
     return "\n".join(lines)
 
 
-async def _show_items(callback: CallbackQuery, api: ApiClient) -> None:
-    """Показывает/обновляет список в том же сообщении (edit)."""
-    try:
-        items = await api.list_items(callback.from_user.id)
-    except ApiError as exc:
-        await callback.message.edit_text(f"⚠️ {exc.detail}", reply_markup=main_menu())
-        return
-
-    if not items:
-        await callback.message.edit_text(
-            "У тебя пока нет отслеживаемых товаров.", reply_markup=main_menu()
-        )
-        return
-
-    await callback.message.edit_text(
-        _render_items(items),
-        reply_markup=items_list(items),
-        link_preview_options=LinkPreviewOptions(is_disabled=True),
-    )
-
-
-@router.callback_query(F.data == "list_items")
-async def cb_list_items(callback: CallbackQuery, api: ApiClient) -> None:
-    await _show_items(callback, api)
-    await callback.answer()
-
-
 @router.callback_query(F.data.startswith("del_item:"))
 async def cb_delete_item(callback: CallbackQuery, api: ApiClient) -> None:
     item_id = int(callback.data.split(":", 1)[1])
@@ -154,6 +160,13 @@ async def cb_delete_item(callback: CallbackQuery, api: ApiClient) -> None:
     except ApiError as exc:
         await callback.answer(exc.detail, show_alert=True)
         return
+
     # перерисовываем тот же список без удалённого товара
-    await _show_items(callback, api)
+    try:
+        items = await api.list_items(callback.from_user.id)
+    except ApiError as exc:
+        await callback.answer(exc.detail, show_alert=True)
+        return
+
+    await _send_items(callback.message.edit_text, items)
     await callback.answer("Удалено")

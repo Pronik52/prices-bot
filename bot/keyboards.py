@@ -1,30 +1,39 @@
-"""Inline-клавиатуры бота."""
+"""Клавиатуры бота."""
 from __future__ import annotations
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+# Тексты кнопок прикреплённого меню — используются и в клавиатуре, и в фильтрах хендлеров.
+BTN_ADD = "➕ Добавить товар"
+BTN_LIST = "📋 Мои товары"
 
-def main_menu() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text="➕ Добавить товар", callback_data="add_item")
-    builder.button(text="📋 Мои товары", callback_data="list_items")
-    builder.button(text="💎 Тарифы", callback_data="show_tiers")
-    builder.adjust(1)
-    return builder.as_markup()
+
+def main_menu() -> ReplyKeyboardMarkup:
+    """Постоянное меню внизу экрана.
+
+    is_persistent=True держит клавиатуру прикреплённой, поэтому нужные действия
+    всегда под рукой — их не нужно искать в переписке после потока уведомлений.
+    """
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=BTN_ADD), KeyboardButton(text=BTN_LIST)]],
+        resize_keyboard=True,
+        is_persistent=True,
+        input_field_placeholder="Выбери действие или пришли ссылку на товар",
+    )
 
 
 def items_list(items: list[dict]) -> InlineKeyboardMarkup:
-    """Одна клавиатура на весь список: по кнопке удаления на товар + «В меню».
-
-    Всё в одном сообщении, которое затем редактируется — без спама новыми
-    сообщениями.
-    """
+    """Кнопки удаления по товару на всё сообщение со списком."""
     builder = InlineKeyboardBuilder()
     for it in items:
         title = it.get("title") or f"Товар {it['external_id']}"
         builder.button(text=f"🗑 {title[:28]}", callback_data=f"del_item:{it['id']}")
-    builder.button(text="◀️ В меню", callback_data="menu")
     builder.adjust(1)
     return builder.as_markup()
 
