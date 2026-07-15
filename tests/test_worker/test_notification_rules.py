@@ -33,17 +33,17 @@ def test_price_unchanged_no_notify():
 
 
 def test_significant_drop_no_target_notifies():
-    # цель не задана, снижение ровно на 2% — значимое, уведомляем
-    assert should_notify(_item(target=None, last=1000), Decimal(980)) is True
+    # цель не задана, снижение ровно на 10% — значимое, уведомляем
+    assert should_notify(_item(target=None, last=1000), Decimal(900)) is True
 
 
 def test_small_drop_no_target_no_notify():
-    # цель не задана, снижение меньше 2% — незначимое, молчим
-    assert should_notify(_item(target=None, last=1000), Decimal(990)) is False
+    # цель не задана, снижение меньше 10% — незначимое, молчим
+    assert should_notify(_item(target=None, last=1000), Decimal(950)) is False
 
 
 def test_target_reached_notifies():
-    # цель задана и достигнута — уведомляем даже при снижении меньше 2%
+    # цель задана и достигнута — уведомляем даже при снижении меньше 10%
     assert should_notify(_item(target=995, last=1000), Decimal(995)) is True
 
 

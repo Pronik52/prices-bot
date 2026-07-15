@@ -5,8 +5,8 @@ from decimal import Decimal
 
 from db.models.tracked_item import TrackedItem
 
-# Порог «значимого» снижения, когда целевая цена не задана: 2%.
-SIGNIFICANT_DROP_RATIO = Decimal("0.02")
+# Порог «значимого» снижения, когда целевая цена не задана: 10%.
+SIGNIFICANT_DROP_RATIO = Decimal("0.10")
 
 
 def should_notify(item: TrackedItem, new_price: Decimal) -> bool:
@@ -16,7 +16,7 @@ def should_notify(item: TrackedItem, new_price: Decimal) -> bool:
     сравнивать не с чем. Рост цены игнорируем. При снижении:
 
     * если задана целевая цена — сигналим, когда цена достигла цели (≤ цели);
-    * если цель не задана — только при значимом снижении (не меньше 2%),
+    * если цель не задана — только при значимом снижении (не меньше 10%),
       чтобы не спамить на каждое копеечное колебание.
     """
     if item.last_price is None:
