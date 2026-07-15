@@ -25,6 +25,9 @@ env/
 .coverage
 htmlcov/
 
+# macOS
+.DS_Store
+
 # Misc
 graphify-out/
 *.log
